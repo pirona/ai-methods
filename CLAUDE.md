@@ -147,7 +147,102 @@ backend bk_<service>
 
 ---
 
-## 6. Automation platform — Known constraints
+## 6. Méthodologie CI : Gitea sans runner → push mirror → GitHub Actions
+
+> Template réutilisable pour tout projet hébergé sur Gitea (self-hosted, sans runner CI),
+> avec build automatisé via les runners GitHub Actions gratuits.
+
+### Architecture
+
+```
+Développement local
+       ↓  git push / git push origin <tag>
+  Gitea (privé, homegit.gyozamancave.fr)   ← dépôt principal, pas de runner
+       ↓  push mirror automatique
+  GitHub (public ou privé)                 ← miroir passif
+       ↓  tag v*.*.*
+  GitHub Actions                           ← CI/CD, build, release
+```
+
+### Configuration du push mirror dans Gitea
+
+Gitea → Settings → Repository → **Push Mirrors** :
+- Mirror URL : `https://github.com/USER/REPO.git`
+- Credentials : token GitHub avec scope `repo`
+- Synchronisation : immédiate à chaque push
+
+Tous les commits, branches et tags poussés sur Gitea sont répliqués sur GitHub
+automatiquement. Ne jamais pousser directement sur GitHub — Gitea est la source de vérité.
+
+### Workflow GitHub Actions type
+
+```yaml
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build:
+    # Guard clause : n'exécuter que sur GitHub, pas sur Gitea
+    # (protection si Gitea est un jour équipé d'un runner)
+    if: github.server_url == 'https://github.com'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # obligatoire pour créer une GitHub Release
+
+    steps:
+      - uses: actions/checkout@v4
+      # … étapes de build spécifiques au projet …
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+```
+
+**Points clés :**
+- Déclencheur `push.tags: ['v*.*.*']` — build intentionnel, pas à chaque commit.
+- Guard `if: github.server_url == 'https://github.com'` — safe si l'architecture évolue.
+- `permissions: contents: write` — obligatoire pour `action-gh-release`.
+- Secrets (keystores, tokens) : stockés dans GitHub → Settings → Secrets, jamais dans le dépôt.
+
+### Génération automatique du changelog
+
+Extrait les commits `feat:` et `fix:` entre le tag précédent et HEAD :
+
+```bash
+PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${{ github.ref_name }}$" | head -1)
+
+FEATS=$(git log "${PREV_TAG}..HEAD" --pretty=format:"%s" --no-merges \
+  | grep -E "^feat(\([^)]+\))?: " \
+  | sed -E 's/^feat(\([^)]+\))?: //' \
+  | sed 's/^/- /')
+
+FIXES=$(git log "${PREV_TAG}..HEAD" --pretty=format:"%s" --no-merges \
+  | grep -E "^fix(\([^)]+\))?: " \
+  | sed -E 's/^fix(\([^)]+\))?: //' \
+  | sed 's/^/- /')
+```
+
+Nécessite des messages de commit au format [Conventional Commits](https://www.conventionalcommits.org/).
+
+### Workflow de release
+
+```bash
+# Développement normal
+git commit -m "feat(scope): description"
+git push                        # répliqué sur GitHub via mirror
+
+# Déclencher une release
+git tag v1.x.y
+git push origin v1.x.y          # tag répliqué → Actions déclenché → Release créée
+```
+
+---
+
+## 7. Automation platform — Known constraints
 
 - `getWorkflowStaticData('global')` for cross-execution deduplication
 - Some downstream services reject SVG URLs — use direct JPG URLs instead
@@ -158,7 +253,7 @@ backend bk_<service>
 
 ---
 
-## 7. Kubernetes (K3s)
+## 8. Kubernetes (K3s)
 
 - Cluster: 1 control plane + 2 workers
 - GitOps via **ArgoCD**
@@ -168,7 +263,7 @@ backend bk_<service>
 
 ---
 
-## 8. Domains & DNS
+## 9. Domains & DNS
 
 - All public traffic goes through HAProxy (see section 4)
 - Existing subdomains must be checked before any modification
@@ -177,7 +272,7 @@ backend bk_<service>
 
 ---
 
-## 9. Audio / Music (workstation)
+## 10. Audio / Music (workstation)
 
 - **Current DAW:** Ableton Live (Windows)
 - **Target Linux DAW:** Bitwig Studio (pending Windows stabilization)
@@ -187,7 +282,7 @@ backend bk_<service>
 
 ---
 
-## 10. General rules for Claude Code
+## 11. General rules for Claude Code
 
 1. **Always verify** that a dedicated Let's Encrypt cert exists before proposing
    a public URL for a new service.
