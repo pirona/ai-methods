@@ -15,6 +15,8 @@ stored at the project (or global) level. It contains:
 - **Hard constraints** — HAProxy/TLS rules that must never be violated, ZFS rules, etc.
 - **Tech stack reference** — so Claude never suggests tools outside my ecosystem
 - **Numbered rules** — explicit, non-negotiable behaviors (no wildcard certs, no TLS bypass, etc.)
+- **Security by design** — hardening is a design constraint from day 1, not a post-deployment pass
+- **Documentation philosophy** — doc is written from day 1, pedagogical, lives in the repo
 
 This means I never re-explain my environment. Claude enters every session already knowing
 the full picture. The CLAUDE.md is a living document — I update it whenever a new hard
@@ -106,7 +108,37 @@ These rules travel with every project automatically.
 
 ---
 
-## 8. Infrastructure Knowledge as First-Class Input
+## 8. Security by Design — Baked In from Day 1
+
+Security hardening is not a phase that comes after deployment — it's a design constraint
+encoded in CLAUDE.md so it applies automatically to every project:
+
+- Least privilege for users, services, and network rules from the start
+- No open ports or `0.0.0.0` binds without documented justification
+- Secrets management defined before the first commit (Vault, sealed-secrets, GitHub Secrets)
+- TLS everywhere feasible, even on internal services
+- Audit logging planned in the architecture phase, not retrofitted
+- Threat model identified before proposing any architecture
+
+The result: Claude's first proposal is already hardened. No "we'll secure it later" suggestions.
+
+---
+
+## 9. Documentation as a First-Class Deliverable
+
+Documentation is written from day 1 and evolves alongside the code until completion.
+The philosophy is baked into CLAUDE.md so it applies to every document Claude produces:
+
+- **Simple**: clear language, no jargon without definition
+- **Exhaustive**: prerequisites, architecture decisions, operational procedures, known limitations
+- **Pedagogical**: explains *what* we do AND *why* — not just a list of commands to copy-paste
+
+Every command block gets an explanation of what it does and what to verify afterward.
+Architecture decisions are documented at the time they're made, in the same commit as the code.
+
+---
+
+## 10. Infrastructure Knowledge as First-Class Input
 
 I don't ask Claude to "figure out" my infrastructure from context clues.
 Every service, IP range, constraint, and convention is explicitly documented in CLAUDE.md.
@@ -128,6 +160,8 @@ A new service already includes the full deployment checklist.
 | Validate each step before the next | Tight feedback loop, errors caught early |
 | Explicit numbered rules | No negotiation on critical constraints |
 | Ask before long implementations | Alignment before effort |
+| Security by design in CLAUDE.md | First proposal is already hardened, no retrofitting |
+| Documentation philosophy in CLAUDE.md | Every doc produced is pedagogical by default |
 
 ---
 
