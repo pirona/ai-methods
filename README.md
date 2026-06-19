@@ -94,6 +94,16 @@ For anything non-trivial, I ask Claude to outline the approach first:
 Claude gives a 2-3 sentence recommendation with the main trade-off. I redirect if needed,
 then confirm before implementation starts. This prevents wasted effort on the wrong path.
 
+### LLM Council for architecture and strategic decisions
+
+For project conception and high-stakes decisions, I use the
+[LLM Council skill](https://github.com/aiwithremy/claude-skills-llm-council) with Claude Desktop.
+It convenes multiple models simultaneously and synthesizes their perspectives into a single answer —
+useful for decisions where a single model's blind spots could lead the design astray.
+
+Setup note: the skill triggers on English prompts only by default. I configured it to respond
+in French to match my working language.
+
 ---
 
 ## 7. Licensing and Documentation Rules (Baked In)
