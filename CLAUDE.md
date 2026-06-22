@@ -275,6 +275,20 @@ git tag v1.x.y
 git push origin v1.x.y          # tag mirrored → Actions triggered → Release created
 ```
 
+### Build sequencing — hard rule
+
+**One build at a time.** Never push a tag (or any other CI trigger) while a previous
+build is still running.
+
+- After each `git push origin vX.Y.Z`: wait for explicit confirmation that the build
+  passed before tagging again.
+- If multiple commits are ready: push them to `main` without a tag, then tag only
+  when the time comes.
+- Never batch-push tags that each trigger independent CI builds.
+
+Rationale: concurrent builds waste runner minutes, produce race conditions on release
+asset uploads, and make it harder to bisect which tag introduced a regression.
+
 ---
 
 ## 7. Automation platform — Known constraints
