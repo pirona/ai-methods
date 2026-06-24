@@ -182,7 +182,97 @@ curl -H "Authorization: Bearer $(cat /path/to/.token | tr -d '\n')" \
 
 ---
 
-## 6. CI methodology: self-hosted Git (no runner) → push mirror → GitHub Actions
+## 6. Credentials & token management
+
+Store tokens in files outside any repository, never in URLs or shell arguments.
+
+```
+~/.tokens/<service>_pat   # chmod 600, parent dir chmod 700
+```
+
+For GitHub HTTPS operations, register via git credential store:
+
+```bash
+mkdir -p ~/.tokens && chmod 700 ~/.tokens
+printf '<token>' > ~/.tokens/github_pat && chmod 600 ~/.tokens/github_pat
+printf "https://<username>:%s@github.com\n" "$(cat ~/.tokens/github_pat)" >> ~/.git-credentials
+git config --global credential.helper store
+```
+
+Global gitignore (`~/.config/git/ignore`) must include token filename patterns:
+
+```
+.token
+.token*
+*.token
+github_pat
+github_pat*
+```
+
+---
+
+## 6b. Wiki — Multi-platform workflow (self-hosted Git + GitHub)
+
+> Applies to any project hosted on a self-hosted Git instance with a push mirror to GitHub.
+
+Wiki repos are **independent git repositories**, separate from the code repo.
+Push mirrors (code repo) do **not** cover the wiki repos.
+Both wikis must be pushed independently on every documentation update.
+
+### Repository URLs
+
+```
+Self-hosted wiki  :  ssh://git@<your-git-host>:<port>/<username>/<repo>.wiki.git  (branch: master)
+GitHub wiki       :  https://github.com/<github-user>/<repo>.wiki.git             (branch: master)
+```
+
+The `master` branch is mandatory on Gitea — it is the only branch the Gitea wiki UI reads.
+
+### Initial setup
+
+```bash
+# Clone from self-hosted Git
+git clone ssh://git@<your-git-host>:<port>/<username>/<repo>.wiki.git wiki-<repo>/
+cd wiki-<repo>/
+
+# Add GitHub remote (credential store provides the token automatically)
+git remote add github https://github.com/<github-user>/<repo>.wiki.git
+
+# Push both
+git push origin master
+git push github master --force   # --force only if GitHub had an init placeholder page
+```
+
+> **GitHub prerequisite:** the GitHub wiki repo does not exist until a first page is created
+> via the UI (`github.com/<user>/<repo>/wiki` → "Create the first page"). Do this before the first push.
+
+### Ongoing updates
+
+```bash
+cd wiki-<repo>/
+# … edit .md files …
+git add -A && git commit -m "docs: <description>"
+git push origin master   # self-hosted Git
+git push github master   # GitHub
+```
+
+### README links
+
+Use **dual links** — each platform points to its own wiki:
+
+```markdown
+Documentation: [Gitea](https://<your-git-host>/<username>/<repo>/wiki) · [GitHub](https://github.com/<github-user>/<repo>/wiki)
+
+| Page | Self-hosted | GitHub |
+|------|-------------|--------|
+| Architecture | [↗](https://<your-git-host>/<username>/<repo>/wiki/Architecture) | [↗](https://github.com/<github-user>/<repo>/wiki/Architecture) |
+```
+
+Never use a single link that only resolves correctly on one platform.
+
+---
+
+## 7. CI methodology: self-hosted Git (no runner) → push mirror → GitHub Actions
 
 > Reusable template for any project hosted on a self-hosted Gitea instance
 > (no local CI runner), with automated builds via free GitHub Actions runners.
