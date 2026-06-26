@@ -278,6 +278,33 @@ Never use a single link that only resolves correctly on one platform.
 
 ---
 
+## 6c. LLM Council — Multi-model strategic decisions
+
+> Credit: [LLM Council skill](https://github.com/aiwithremy/claude-skills-llm-council)
+> by [@aiwithremy](https://github.com/aiwithremy) — genuinely excellent, highly recommended.
+
+For high-stakes design decisions and project conception, the LLM Council skill is outstanding.
+It convenes multiple frontier models simultaneously (Claude, GPT-4o, Gemini, etc.) and
+synthesizes their perspectives into a single, consolidated answer.
+
+**Why it matters:** a single model has blind spots. Architectural decisions made with only
+one model's judgment can silently inherit its biases or miss entire categories of risk.
+The Council surfaces disagreements between models, which is exactly where the interesting
+trade-offs live.
+
+**When to use it:**
+- Architecture choices with long-term consequences (storage backend, auth strategy, infra topology)
+- Technology selection where trade-offs are non-obvious
+- Security model design before the first line of code
+- Any decision where "getting it wrong" would be expensive to reverse
+
+**Setup note:** the skill triggers on English prompts by default. Configure the response
+language to match your working language if needed.
+
+Use via Claude Desktop, not Claude Code — the skill runs as a slash command in the Desktop app.
+
+---
+
 ## 7. CI methodology: self-hosted Git (no runner) → push mirror → GitHub Actions
 
 > Reusable template for any project hosted on a self-hosted Gitea instance
