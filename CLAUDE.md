@@ -129,6 +129,12 @@ backend bk_<service>
 
 ## 5. Code & CI/CD conventions
 
+### Code comments
+
+- **Synthetic and concise**: a comment explains the *why*, never the *what* — the code itself expresses what.
+- **Language**: match the language already in use in the repository. Do not comment in French if the rest of the code is in English, and vice versa.
+- No multi-line blocks, no essay docstrings — one short line when strictly necessary.
+
 ### Ansible
 
 - Lint: **ansible-lint** + **PEP8** on all playbooks
@@ -440,6 +446,9 @@ asset uploads, and make it harder to bisect which tag introduced a regression.
     only consult **official documentation** from the relevant project, vendor, or standards body.
     Forbidden sources: Stack Overflow, Reddit, third-party forums, personal blogs,
     unofficial community wikis. When in doubt about a source's legitimacy, don't use it.
+14. **Sequential by default**: never run multiple actions in parallel without explicit approval.
+    If parallelism seems worthwhile (truly independent actions, significant time gain), submit
+    the opinion for validation before acting.
 
 ---
 
