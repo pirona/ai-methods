@@ -501,6 +501,41 @@ not a post-deployment audit or an optional hardening pass.
 
 ---
 
+## 13. Working Methodology
+
+### Strategic questions / vague instructions
+
+Use **LLM Council** (Claude Desktop skill) to get cross-model perspectives before deciding.
+If unavailable: list options with trade-offs, wait for selection.
+
+### Precise orders — mandatory sequence
+
+1. **Review existing state** — read code, configs, and related services before any action.
+2. **What do we want?** — restate the objective in one clear sentence and submit it.
+3. **How will we do it?** — complete action plan submitted for validation before execution.
+4. **Integration** — explicitly identify how the change integrates with the existing system
+   (dependencies, interfaces, side effects).
+5. **Simplicity first** — simplest, functional, maintainable solution.
+   No premature abstractions, no unnecessary dependencies.
+
+### Execution rules
+
+- **No action without prior validation.**
+- **Strictly sequential**: one step at a time, in the order of the validated plan.
+  No parallel or simultaneous actions without explicit agreement.
+
+### After each implementation / deployment
+
+Systematic code review of all interactions between what was just deployed and the existing system:
+interfaces, dependencies, potential side effects.
+
+### When the user says "ok"
+
+1. Final code review — complete verification of all changes.
+2. Project memory update — save key decisions, identified constraints, and project state.
+
+---
+
 ## 12. Documentation philosophy
 
 Documentation is written from the first day of a project and evolves alongside the work

@@ -159,6 +159,29 @@ A new service already includes the full deployment checklist.
 
 ---
 
+## 10. The Execution Methodology — Locked In
+
+Every session follows a fixed protocol, encoded in CLAUDE.md so it applies automatically.
+
+**For vague or strategic questions**: LLM Council first (see section 6).
+
+**For precise orders**, always in this order:
+1. Review existing state
+2. State the objective
+3. Propose a plan (wait for approval before acting)
+4. Identify integration points with the existing system
+5. Implement the simplest, most maintainable solution
+
+**During execution**: strictly sequential, one step at a time. No parallel actions without explicit approval.
+
+**After each deployment**: code review of all interactions with the existing system.
+
+**When "ok" is given**: final code review + project memory update.
+
+The discipline here is the point: Claude proposes, I validate, Claude executes one step, I observe, we continue. No surprises.
+
+---
+
 ## Key Takeaways
 
 | What I do | Why it works |
@@ -167,6 +190,7 @@ A new service already includes the full deployment checklist.
 | Persistent memory | Cross-session continuity without re-explaining |
 | Short imperative commands | Fast, no ambiguity |
 | Ask for options on uncertain choices | Avoids rework on the wrong approach |
+| Fixed execution methodology | Proposal → validation → sequential execution → review |
 | Validate each step before the next | Tight feedback loop, errors caught early |
 | Explicit numbered rules | No negotiation on critical constraints |
 | Ask before long implementations | Alignment before effort |
