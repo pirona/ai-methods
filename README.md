@@ -1,5 +1,8 @@
 # How I Pilot Claude Code — My Method
 
+If you like it and/or useit, please consider a coffee ^ : 
+→ [Ko-fi](https://ko-fi.com/billisdead)
+
 A practical account of how I get consistent, high-quality results from Claude Code
 across infrastructure, development, and creative projects.
 
