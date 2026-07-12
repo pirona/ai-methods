@@ -554,3 +554,39 @@ until completion. It is never a post-mortem dump or an afterthought.
   they are made, not reconstructed from memory six months later.
 - Documentation lives in the repository alongside the code it describes.
   If the code changes, the documentation changes in the same commit.
+
+---
+
+## 14. Acceptance testing — real-device validation via adb
+
+> Applies to any mobile project (Android/iOS) with access to a physical device.
+> Complements section 7 (CI methodology) and section 13 (working methodology) — does not
+> replace them.
+
+A bug is only considered fixed, and a fix is only ready to be committed/tagged, after it has
+been reproduced and validated on a real device — never on the strength of a code review, a
+plausible hypothesis, or theoretical reasoning alone, no matter how solid it looks.
+
+- **Device connection**: prefer adb wireless debugging (Android 11+) when the workstation
+  doesn't see the phone over USB. Sequence:
+  `adb pair <ip>:<pairing_port> <code>` then `adb connect <ip>:<main_port>`
+  (the main port changes every time wireless debugging is toggled — ask the user again if needed).
+- **Before any commit claiming to fix a bug**: reproduce the exact user scenario on the device
+  (same gestures, same screen, same conditions) and confirm the buggy behavior is actually
+  gone — not just that the code "looks" correct.
+- **If the fix touches a server-side flow** (API save, sync): verify the result server-side
+  after the action, not just the client-side display — a screen can look correct while
+  persistence silently failed.
+- **Never push a new build tag on the strength of an unverified hypothesis about a device
+  bug.** Fix, reproduce, confirm, only then commit/tag — see section 7 (one build at a time,
+  explicit user validation between tags, including when a new fix hypothesis follows a first
+  attempt that failed).
+- **Reproduce on test data, never on production data without explicit approval**: for a
+  destructive scenario (data loss, overwrite), create/delete dedicated test records (explicit
+  title pattern like `TEST_xxx_TO_DELETE`), clean up afterward.
+
+Lesson learned: a first fix (Android keyboard resize mode) was shipped and tagged on the
+strength of a plausible hypothesis, without a confirmed device repro — the CI build passed,
+but the bug persisted in real usage. A second pass with an actual adb repro (real text
+selection on the real screen, save, re-read the persisted content server-side) revealed the
+real cause — a missing API parameter, invisible from reading the client business logic alone.

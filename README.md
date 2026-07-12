@@ -185,6 +185,30 @@ The discipline here is the point: Claude proposes, I validate, Claude executes o
 
 ---
 
+## 11. Real-Device Validation Loop (Mobile Projects)
+
+For mobile projects, a fix isn't "done" because the code review looks right — it's done
+after Claude has reproduced the exact bug on a physical device and watched it actually go
+away.
+
+```
+Fix hypothesis → Reproduce on real device (adb) → Confirm server-side result if relevant → Commit/tag
+```
+
+I connect Claude to my phone over adb wireless debugging (pairing code once, then
+`adb connect` — the port rotates each session) and have it drive the actual screens: tap
+through the real UI, type real input, trigger the real gesture that caused the bug. If the
+fix touches anything server-side, Claude checks the persisted result, not just what the
+screen shows — a screen can look fine while the save silently failed.
+
+This caught me out once: a first fix shipped and built successfully in CI, but hadn't
+actually been reproduced on-device before tagging. The bug was still there. A second pass,
+this time with a real adb repro before touching the release tag, found the actual root
+cause in a few minutes — something no amount of re-reading the code would have surfaced.
+Now it's a hard rule in CLAUDE.md: no new build tag without an on-device repro first.
+
+---
+
 ## Key Takeaways
 
 | What I do | Why it works |
@@ -199,6 +223,7 @@ The discipline here is the point: Claude proposes, I validate, Claude executes o
 | Ask before long implementations | Alignment before effort |
 | Security by design in CLAUDE.md | First proposal is already hardened, no retrofitting |
 | Documentation philosophy in CLAUDE.md | Every doc produced is pedagogical by default |
+| Real-device repro before tagging a fix (mobile) | Catches root causes a code review alone misses |
 
 ---
 
