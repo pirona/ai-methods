@@ -1,7 +1,14 @@
-# CLAUDE.md — Global Instructions
+# CLAUDE.md — Claude Code Operator Template
 
-> Global instructions for Claude Code. This file describes the full technical environment,
-> working conventions, and hard rules that apply across all projects.
+> **Public template for Claude Code configuration.**
+> This file captures a complete operator profile for a Linux infrastructure engineer
+> with a self-hosted homelab. Fork it, adapt the sections to your own stack,
+> and replace `[FILL IN: ...]` markers with your own values.
+> Sections on TLS rules, CI conventions, and general guidelines are universal
+> and can be used as-is or lightly adjusted.
+>
+> Original profile: Linux/K8s infrastructure, self-hosted services, HAProxy TLS termination,
+> GitOps with ArgoCD, electronic music production as a side domain.
 
 ---
 
@@ -122,6 +129,12 @@ backend bk_<service>
 
 ## 5. Code & CI/CD conventions
 
+### Code comments
+
+- **Synthetic and concise**: a comment explains the *why*, never the *what* — the code itself expresses what.
+- **Language**: match the language already in use in the repository. Do not comment in French if the rest of the code is in English, and vice versa.
+- No multi-line blocks, no essay docstrings — one short line when strictly necessary.
+
 ### Ansible
 
 - Lint: **ansible-lint** + **PEP8** on all playbooks
@@ -145,36 +158,181 @@ backend bk_<service>
 - Convention: imperative present tense, English (`Add`, `Fix`, `Remove`)
 - No direct commits to `main` — MR/PR mandatory
 
+#### Push to self-hosted Git — always via SSH
+
+Non-standard SSH port common on self-hosted instances — always check. URL format:
+
+```
+ssh://git@<your-git-host>:<port>/<username>/<repo>.git
+```
+
+Configure the remote:
+
+```bash
+git remote set-url origin ssh://git@<your-git-host>:<port>/<username>/<repo>.git
+```
+
+SSH keys on the workstation must be pre-authorized on the instance.
+**Never use HTTPS for git push to a self-hosted instance**: CLI HTTPS auth is often not configured.
+
+#### Self-hosted Git API (REST)
+
+Store the API token in a local file outside the repository.
+Never embed the token value in a URL or shell argument.
+Pass it only via header:
+
+```bash
+curl -H "Authorization: Bearer $(cat /path/to/.token | tr -d '\n')" \
+     https://<your-git-host>/api/v1/...
+```
+
 ---
 
-## 6. Méthodologie CI : Gitea sans runner → push mirror → GitHub Actions
+## 6. Credentials & token management
 
-> Template réutilisable pour tout projet hébergé sur Gitea (self-hosted, sans runner CI),
-> avec build automatisé via les runners GitHub Actions gratuits.
+Store tokens in files outside any repository, never in URLs or shell arguments.
+
+```
+~/.tokens/<service>_pat   # chmod 600, parent dir chmod 700
+```
+
+For GitHub HTTPS operations, register via git credential store:
+
+```bash
+mkdir -p ~/.tokens && chmod 700 ~/.tokens
+printf '<token>' > ~/.tokens/github_pat && chmod 600 ~/.tokens/github_pat
+printf "https://<username>:%s@github.com\n" "$(cat ~/.tokens/github_pat)" >> ~/.git-credentials
+git config --global credential.helper store
+```
+
+Global gitignore (`~/.config/git/ignore`) must include token filename patterns:
+
+```
+.token
+.token*
+*.token
+github_pat
+github_pat*
+```
+
+---
+
+## 6b. Wiki — Multi-platform workflow (self-hosted Git + GitHub)
+
+> Applies to any project hosted on a self-hosted Git instance with a push mirror to GitHub.
+
+Wiki repos are **independent git repositories**, separate from the code repo.
+Push mirrors (code repo) do **not** cover the wiki repos.
+Both wikis must be pushed independently on every documentation update.
+
+### Repository URLs
+
+```
+Self-hosted wiki  :  ssh://git@<your-git-host>:<port>/<username>/<repo>.wiki.git  (branch: master)
+GitHub wiki       :  https://github.com/<github-user>/<repo>.wiki.git             (branch: master)
+```
+
+The `master` branch is mandatory on Gitea — it is the only branch the Gitea wiki UI reads.
+
+### Initial setup
+
+```bash
+# Clone from self-hosted Git
+git clone ssh://git@<your-git-host>:<port>/<username>/<repo>.wiki.git wiki-<repo>/
+cd wiki-<repo>/
+
+# Add GitHub remote (credential store provides the token automatically)
+git remote add github https://github.com/<github-user>/<repo>.wiki.git
+
+# Push both
+git push origin master
+git push github master --force   # --force only if GitHub had an init placeholder page
+```
+
+> **GitHub prerequisite:** the GitHub wiki repo does not exist until a first page is created
+> via the UI (`github.com/<user>/<repo>/wiki` → "Create the first page"). Do this before the first push.
+
+### Ongoing updates
+
+```bash
+cd wiki-<repo>/
+# … edit .md files …
+git add -A && git commit -m "docs: <description>"
+git push origin master   # self-hosted Git
+git push github master   # GitHub
+```
+
+### README links
+
+Use **dual links** — each platform points to its own wiki:
+
+```markdown
+Documentation: [Gitea](https://<your-git-host>/<username>/<repo>/wiki) · [GitHub](https://github.com/<github-user>/<repo>/wiki)
+
+| Page | Self-hosted | GitHub |
+|------|-------------|--------|
+| Architecture | [↗](https://<your-git-host>/<username>/<repo>/wiki/Architecture) | [↗](https://github.com/<github-user>/<repo>/wiki/Architecture) |
+```
+
+Never use a single link that only resolves correctly on one platform.
+
+---
+
+## 6c. LLM Council — Multi-model strategic decisions
+
+> Credit: [LLM Council skill](https://github.com/aiwithremy/claude-skills-llm-council)
+> by [@aiwithremy](https://github.com/aiwithremy) — genuinely excellent, highly recommended.
+
+For high-stakes design decisions and project conception, the LLM Council skill is outstanding.
+It convenes multiple frontier models simultaneously (Claude, GPT-4o, Gemini, etc.) and
+synthesizes their perspectives into a single, consolidated answer.
+
+**Why it matters:** a single model has blind spots. Architectural decisions made with only
+one model's judgment can silently inherit its biases or miss entire categories of risk.
+The Council surfaces disagreements between models, which is exactly where the interesting
+trade-offs live.
+
+**When to use it:**
+- Architecture choices with long-term consequences (storage backend, auth strategy, infra topology)
+- Technology selection where trade-offs are non-obvious
+- Security model design before the first line of code
+- Any decision where "getting it wrong" would be expensive to reverse
+
+**Setup note:** the skill triggers on English prompts by default. Configure the response
+language to match your working language if needed.
+
+Use via Claude Desktop, not Claude Code — the skill runs as a slash command in the Desktop app.
+
+---
+
+## 7. CI methodology: self-hosted Git (no runner) → push mirror → GitHub Actions
+
+> Reusable template for any project hosted on a self-hosted Gitea instance
+> (no local CI runner), with automated builds via free GitHub Actions runners.
 
 ### Architecture
 
 ```
-Développement local
+Local development
        ↓  git push / git push origin <tag>
-  Gitea (privé, homegit.gyozamancave.fr)   ← dépôt principal, pas de runner
-       ↓  push mirror automatique
-  GitHub (public ou privé)                 ← miroir passif
+  Self-hosted Gitea (private)   ← source of truth, no runner
+       ↓  automatic push mirror
+  GitHub (public or private)    ← passive mirror
        ↓  tag v*.*.*
-  GitHub Actions                           ← CI/CD, build, release
+  GitHub Actions                ← CI/CD, build, release
 ```
 
-### Configuration du push mirror dans Gitea
+### Configuring the push mirror in Gitea
 
-Gitea → Settings → Repository → **Push Mirrors** :
-- Mirror URL : `https://github.com/USER/REPO.git`
-- Credentials : token GitHub avec scope `repo`
-- Synchronisation : immédiate à chaque push
+Gitea → Settings → Repository → **Push Mirrors**:
+- Mirror URL: `https://github.com/USER/REPO.git`
+- Credentials: GitHub token with `repo` scope
+- Sync: immediate on every push
 
-Tous les commits, branches et tags poussés sur Gitea sont répliqués sur GitHub
-automatiquement. Ne jamais pousser directement sur GitHub — Gitea est la source de vérité.
+All commits, branches, and tags pushed to Gitea are automatically replicated to GitHub.
+Never push directly to GitHub — the self-hosted instance is the source of truth.
 
-### Workflow GitHub Actions type
+### Reference GitHub Actions workflow
 
 ```yaml
 name: Release
@@ -186,31 +344,31 @@ on:
 
 jobs:
   build:
-    # Guard clause : n'exécuter que sur GitHub, pas sur Gitea
-    # (protection si Gitea est un jour équipé d'un runner)
+    # Guard clause: only run on GitHub, not on Gitea
+    # (safety net if self-hosted Gitea gains a runner later)
     if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # obligatoire pour créer une GitHub Release
+      contents: write   # required to create a GitHub Release
 
     steps:
       - uses: actions/checkout@v4
-      # … étapes de build spécifiques au projet …
+      # … project-specific build steps …
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
 ```
 
-**Points clés :**
-- Déclencheur `push.tags: ['v*.*.*']` — build intentionnel, pas à chaque commit.
-- Guard `if: github.server_url == 'https://github.com'` — safe si l'architecture évolue.
-- `permissions: contents: write` — obligatoire pour `action-gh-release`.
-- Secrets (keystores, tokens) : stockés dans GitHub → Settings → Secrets, jamais dans le dépôt.
+**Key points:**
+- Trigger `push.tags: ['v*.*.*']` — intentional builds, not on every commit.
+- Guard `if: github.server_url == 'https://github.com'` — safe if architecture evolves.
+- `permissions: contents: write` — required for `action-gh-release`.
+- Secrets (keystores, tokens): stored in GitHub → Settings → Secrets, never in the repo.
 
-### Génération automatique du changelog
+### Automated changelog generation
 
-Extrait les commits `feat:` et `fix:` entre le tag précédent et HEAD :
+Extracts `feat:` and `fix:` commits between the previous tag and HEAD:
 
 ```bash
 PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${{ github.ref_name }}$" | head -1)
@@ -226,25 +384,42 @@ FIXES=$(git log "${PREV_TAG}..HEAD" --pretty=format:"%s" --no-merges \
   | sed 's/^/- /')
 ```
 
-Nécessite des messages de commit au format [Conventional Commits](https://www.conventionalcommits.org/).
+Requires commit messages following [Conventional Commits](https://www.conventionalcommits.org/).
 
-### Workflow de release
+### Release workflow
 
 ```bash
-# Développement normal
+# Normal development
 git commit -m "feat(scope): description"
-git push                        # répliqué sur GitHub via mirror
+git push                        # mirrored to GitHub automatically
 
-# Déclencher une release
+# Trigger a release
 git tag v1.x.y
-git push origin v1.x.y          # tag répliqué → Actions déclenché → Release créée
+git push origin v1.x.y          # tag mirrored → Actions triggered → Release created
 ```
+
+### Build sequencing — hard rule
+
+**One build at a time.** Never push a tag (or any other CI trigger) while a previous
+build is still running.
+
+- After each `git push origin vX.Y.Z`: wait for explicit confirmation that the build
+  passed before tagging again.
+- If multiple commits are ready: push them to `main` without a tag, then tag only
+  when the time comes.
+- Never batch-push tags that each trigger independent CI builds.
+
+Rationale: concurrent builds waste runner minutes, produce race conditions on release
+asset uploads, and make it harder to bisect which tag introduced a regression.
 
 ---
 
 ## 7. Automation platform — Known constraints
 
-- `getWorkflowStaticData('global')` for cross-execution deduplication
+> Applies to n8n or any similar workflow automation platform.
+
+- Use persistent workflow state (e.g. n8n's `getWorkflowStaticData('global')`) for
+  cross-execution deduplication
 - Some downstream services reject SVG URLs — use direct JPG URLs instead
 - Dynamic array expressions can be problematic with certain destinations:
   prefer hardcoded item objects when needed
@@ -272,17 +447,153 @@ git push origin v1.x.y          # tag répliqué → Actions déclenché → Rel
 
 ---
 
-## 10. Audio / Music (workstation)
+## 10. General rules for Claude Code
 
-- **Current DAW:** Ableton Live (Windows)
-- **Target Linux DAW:** Bitwig Studio (pending Windows stabilization)
-- **Plugins:** Mastering suite (iZotope-style), mix assistant, limiter (FabFilter-style)
-- **Future Linux audio stack:** JACK / PipeWire + Windows VST bridge
-- Do not suggest ASIO approaches in a Linux context
+1. **Always verify** that a dedicated Let's Encrypt cert exists before proposing
+   a public URL for a new service.
+2. **Never disable** TLS verification, even in dev — use the internal CA correctly.
+3. **Prefer** low-maintenance-overhead solutions (no exotic dependencies).
+4. **Alerts over active monitoring** — monitoring configs should favor push alerts
+   (webhooks, notification services) over manual polling.
+5. **No bloat** — if a dependency is not strictly necessary, don't add it.
+6. **Prefer European solutions** when the choice is neutral (data sovereignty).
+7. When multiple approaches are valid, **list options with trade-offs**
+   rather than imposing a choice.
+8. Shell commands must be **directly copy-pasteable** — no ambiguous placeholders
+   without explicit explanation of what to substitute.
+9. **ZFS:** always add disks in pairs, never break a mirror to save cost.
+10. Every new homelab service requires: dedicated cert → HAProxy frontend → backend → test.
+11. **Documentation language:** Public-facing documentation must be written in **English**.
+    Private documentation (personal wiki) in **French**.
+    If the destination is not specified, **always ask** before writing.
+12. **App licensing:** All produced or published applications must be licensed under
+    **GNU GPL v3**. Include a `LICENSE` file (full GPL v3 text) and the SPDX identifier
+    `SPDX-License-Identifier: GPL-3.0-or-later` at the top of source files.
+13. **Information sources:** When searching for anything (commands, configs, APIs, best practices),
+    only consult **official documentation** from the relevant project, vendor, or standards body.
+    Forbidden sources: Stack Overflow, Reddit, third-party forums, personal blogs,
+    unofficial community wikis. When in doubt about a source's legitimacy, don't use it.
+14. **Sequential by default**: never run multiple actions in parallel without explicit approval.
+    If parallelism seems worthwhile (truly independent actions, significant time gain), submit
+    the opinion for validation before acting.
 
 ---
 
-## 11. Local AI image generation platform — Known constraints
+## 11. Security by design
+
+Security hardening is a first-class design constraint from day 1 of every project —
+not a post-deployment audit or an optional hardening pass.
+
+- **Least privilege by default**: users, services, and network rules get only the minimum
+  permissions they need to function. Never start permissive and tighten later.
+- **No open surfaces without justification**: no `0.0.0.0` binds, no open ports,
+  no world-readable files without a documented reason.
+- **Secrets management defined before the first commit**: Ansible Vault, sealed-secrets,
+  GitHub Secrets, or equivalent — never plaintext secrets in the repository.
+- **TLS everywhere feasible**: even on internal services. Use the internal CA correctly
+  (see section 4) rather than disabling verification.
+- **Audit logging in the architecture phase**: plan what needs to be logged and where
+  before writing the first line of code — retrofitting observability is expensive.
+- **Dependency hygiene**: pin versions, verify checksums, prefer minimal base images.
+  Every external dependency is an attack surface.
+- **Threat model first**: before proposing an architecture, identify the trust boundaries
+  and what an attacker could target. Design to minimize blast radius.
+
+---
+
+## 13. Working Methodology
+
+### Strategic questions / vague instructions
+
+Use **LLM Council** (Claude Desktop skill) to get cross-model perspectives before deciding.
+If unavailable: list options with trade-offs, wait for selection.
+
+### Precise orders — mandatory sequence
+
+1. **Review existing state** — read code, configs, and related services before any action.
+2. **What do we want?** — restate the objective in one clear sentence and submit it.
+3. **How will we do it?** — complete action plan submitted for validation before execution.
+4. **Integration** — explicitly identify how the change integrates with the existing system
+   (dependencies, interfaces, side effects).
+5. **Simplicity first** — simplest, functional, maintainable solution.
+   No premature abstractions, no unnecessary dependencies.
+
+### Execution rules
+
+- **No action without prior validation.**
+- **Strictly sequential**: one step at a time, in the order of the validated plan.
+  No parallel or simultaneous actions without explicit agreement.
+
+### After each implementation / deployment
+
+Systematic code review of all interactions between what was just deployed and the existing system:
+interfaces, dependencies, potential side effects.
+
+### When the user says "ok"
+
+1. Final code review — complete verification of all changes.
+2. Project memory update — save key decisions, identified constraints, and project state.
+
+---
+
+## 12. Documentation philosophy
+
+Documentation is written from the first day of a project and evolves alongside the work
+until completion. It is never a post-mortem dump or an afterthought.
+
+- **Simple**: clear language, no jargon without definition, structure that a newcomer
+  can follow without prior context.
+- **Exhaustive**: covers prerequisites, context, architecture decisions, operational
+  procedures, and known limitations.
+- **Pedagogical**: explains *what* we do AND *why* — not just a sequence of commands
+  to copy-paste. A reader should understand the reasoning, not just be able to repeat
+  the steps blindly.
+- Every command block is accompanied by an explanation of what it does and what
+  to verify afterward (expected output, side effects, rollback procedure).
+- Architecture decisions — why this tool and not that one — are documented at the time
+  they are made, not reconstructed from memory six months later.
+- Documentation lives in the repository alongside the code it describes.
+  If the code changes, the documentation changes in the same commit.
+
+---
+
+## 14. Acceptance testing — real-device validation via adb
+
+> Applies to any mobile project (Android/iOS) with access to a physical device.
+> Complements section 7 (CI methodology) and section 13 (working methodology) — does not
+> replace them.
+
+A bug is only considered fixed, and a fix is only ready to be committed/tagged, after it has
+been reproduced and validated on a real device — never on the strength of a code review, a
+plausible hypothesis, or theoretical reasoning alone, no matter how solid it looks.
+
+- **Device connection**: prefer adb wireless debugging (Android 11+) when the workstation
+  doesn't see the phone over USB. Sequence:
+  `adb pair <ip>:<pairing_port> <code>` then `adb connect <ip>:<main_port>`
+  (the main port changes every time wireless debugging is toggled — ask the user again if needed).
+- **Before any commit claiming to fix a bug**: reproduce the exact user scenario on the device
+  (same gestures, same screen, same conditions) and confirm the buggy behavior is actually
+  gone — not just that the code "looks" correct.
+- **If the fix touches a server-side flow** (API save, sync): verify the result server-side
+  after the action, not just the client-side display — a screen can look correct while
+  persistence silently failed.
+- **Never push a new build tag on the strength of an unverified hypothesis about a device
+  bug.** Fix, reproduce, confirm, only then commit/tag — see section 7 (one build at a time,
+  explicit user validation between tags, including when a new fix hypothesis follows a first
+  attempt that failed).
+- **Reproduce on test data, never on production data without explicit approval**: for a
+  destructive scenario (data loss, overwrite), create/delete dedicated test records (explicit
+  title pattern like `TEST_xxx_TO_DELETE`), clean up afterward.
+
+Lesson learned: a first fix (Android keyboard resize mode) was shipped and tagged on the
+strength of a plausible hypothesis, without a confirmed device repro — the CI build passed,
+but the bug persisted in real usage. A second pass with an actual adb repro (real text
+selection on the real screen, save, re-read the persisted content server-side) revealed the
+real cause — a missing API parameter, invisible from reading the client business logic alone.
+
+---
+
+## 15. Local AI image generation platform — Known constraints
 
 - Self-hosted node-based image generation tool (ComfyUI-style), reachable over HTTP on
   the local network, with workflows stored as JSON files on disk.
@@ -317,32 +628,3 @@ git push origin v1.x.y          # tag répliqué → Actions déclenché → Rel
    start appending a numeric suffix from the *second* saved file with a given prefix —
    the very first file gets no suffix at all. Include a dynamic placeholder (timestamp,
    seed, etc.) in the filename prefix to guarantee uniqueness from the first run.
-
----
-
-## 12. General rules for Claude Code
-
-1. **Always verify** that a dedicated Let's Encrypt cert exists before proposing
-   a public URL for a new service.
-2. **Never disable** TLS verification, even in dev — use the internal CA correctly.
-3. **Prefer** low-maintenance-overhead solutions (no exotic dependencies).
-4. **Alerts over active monitoring** — monitoring configs should favor push alerts
-   (webhooks, notification services) over manual polling.
-5. **No bloat** — if a dependency is not strictly necessary, don't add it.
-6. **Prefer European solutions** when the choice is neutral (data sovereignty).
-7. When multiple approaches are valid, **list options with trade-offs**
-   rather than imposing a choice.
-8. Shell commands must be **directly copy-pasteable** — no ambiguous placeholders
-   without explicit explanation of what to substitute.
-9. **ZFS:** always add disks in pairs, never break a mirror to save cost.
-10. Every new homelab service requires: dedicated cert → HAProxy frontend → backend → test.
-11. **Documentation language:** Public-facing documentation must be written in **English**.
-    Private documentation (personal wiki) in **French**.
-    If the destination is not specified, **always ask** before writing.
-12. **App licensing:** All produced or published applications must be licensed under
-    **GNU GPL v3**. Include a `LICENSE` file (full GPL v3 text) and the SPDX identifier
-    `SPDX-License-Identifier: GPL-3.0-or-later` at the top of source files.
-13. **Information sources:** When searching for anything (commands, configs, APIs, best practices),
-    only consult **official documentation** from the relevant project, vendor, or standards body.
-    Forbidden sources: Stack Overflow, Reddit, third-party forums, personal blogs,
-    unofficial community wikis. When in doubt about a source's legitimacy, don't use it.

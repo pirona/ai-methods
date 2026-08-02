@@ -1,5 +1,8 @@
 # How I Pilot Claude Code — My Method
 
+If you like it and/or useit, please consider a coffee ^ : 
+→ [Ko-fi](https://ko-fi.com/billisdead)
+
 A practical account of how I get consistent, high-quality results from Claude Code
 across infrastructure, development, and creative projects.
 
@@ -15,6 +18,8 @@ stored at the project (or global) level. It contains:
 - **Hard constraints** — HAProxy/TLS rules that must never be violated, ZFS rules, etc.
 - **Tech stack reference** — so Claude never suggests tools outside my ecosystem
 - **Numbered rules** — explicit, non-negotiable behaviors (no wildcard certs, no TLS bypass, etc.)
+- **Security by design** — hardening is a design constraint from day 1, not a post-deployment pass
+- **Documentation philosophy** — doc is written from day 1, pedagogical, lives in the repo
 
 This means I never re-explain my environment. Claude enters every session already knowing
 the full picture. The CLAUDE.md is a living document — I update it whenever a new hard
@@ -92,6 +97,16 @@ For anything non-trivial, I ask Claude to outline the approach first:
 Claude gives a 2-3 sentence recommendation with the main trade-off. I redirect if needed,
 then confirm before implementation starts. This prevents wasted effort on the wrong path.
 
+### LLM Council for architecture and strategic decisions
+
+For project conception and high-stakes decisions, I use the
+[LLM Council skill](https://github.com/aiwithremy/claude-skills-llm-council) with Claude Desktop.
+It convenes multiple models simultaneously and synthesizes their perspectives into a single answer —
+useful for decisions where a single model's blind spots could lead the design astray.
+
+Setup note: the skill triggers on English prompts only by default. I configured it to respond
+in French to match my working language.
+
 ---
 
 ## 7. Licensing and Documentation Rules (Baked In)
@@ -106,7 +121,37 @@ These rules travel with every project automatically.
 
 ---
 
-## 8. Infrastructure Knowledge as First-Class Input
+## 8. Security by Design — Baked In from Day 1
+
+Security hardening is not a phase that comes after deployment — it's a design constraint
+encoded in CLAUDE.md so it applies automatically to every project:
+
+- Least privilege for users, services, and network rules from the start
+- No open ports or `0.0.0.0` binds without documented justification
+- Secrets management defined before the first commit (Vault, sealed-secrets, GitHub Secrets)
+- TLS everywhere feasible, even on internal services
+- Audit logging planned in the architecture phase, not retrofitted
+- Threat model identified before proposing any architecture
+
+The result: Claude's first proposal is already hardened. No "we'll secure it later" suggestions.
+
+---
+
+## 9. Documentation as a First-Class Deliverable
+
+Documentation is written from day 1 and evolves alongside the code until completion.
+The philosophy is baked into CLAUDE.md so it applies to every document Claude produces:
+
+- **Simple**: clear language, no jargon without definition
+- **Exhaustive**: prerequisites, architecture decisions, operational procedures, known limitations
+- **Pedagogical**: explains *what* we do AND *why* — not just a list of commands to copy-paste
+
+Every command block gets an explanation of what it does and what to verify afterward.
+Architecture decisions are documented at the time they're made, in the same commit as the code.
+
+---
+
+## 10. Infrastructure Knowledge as First-Class Input
 
 I don't ask Claude to "figure out" my infrastructure from context clues.
 Every service, IP range, constraint, and convention is explicitly documented in CLAUDE.md.
@@ -114,6 +159,53 @@ Every service, IP range, constraint, and convention is explicitly documented in 
 The result: Claude's suggestions are immediately actionable, not generic.
 A proposed HAProxy config already follows my exact cert naming convention.
 A new service already includes the full deployment checklist.
+
+---
+
+## 10. The Execution Methodology — Locked In
+
+Every session follows a fixed protocol, encoded in CLAUDE.md so it applies automatically.
+
+**For vague or strategic questions**: LLM Council first (see section 6).
+
+**For precise orders**, always in this order:
+1. Review existing state
+2. State the objective
+3. Propose a plan (wait for approval before acting)
+4. Identify integration points with the existing system
+5. Implement the simplest, most maintainable solution
+
+**During execution**: strictly sequential, one step at a time. No parallel actions without explicit approval.
+
+**After each deployment**: code review of all interactions with the existing system.
+
+**When "ok" is given**: final code review + project memory update.
+
+The discipline here is the point: Claude proposes, I validate, Claude executes one step, I observe, we continue. No surprises.
+
+---
+
+## 11. Real-Device Validation Loop (Mobile Projects)
+
+For mobile projects, a fix isn't "done" because the code review looks right — it's done
+after Claude has reproduced the exact bug on a physical device and watched it actually go
+away.
+
+```
+Fix hypothesis → Reproduce on real device (adb) → Confirm server-side result if relevant → Commit/tag
+```
+
+I connect Claude to my phone over adb wireless debugging (pairing code once, then
+`adb connect` — the port rotates each session) and have it drive the actual screens: tap
+through the real UI, type real input, trigger the real gesture that caused the bug. If the
+fix touches anything server-side, Claude checks the persisted result, not just what the
+screen shows — a screen can look fine while the save silently failed.
+
+This caught me out once: a first fix shipped and built successfully in CI, but hadn't
+actually been reproduced on-device before tagging. The bug was still there. A second pass,
+this time with a real adb repro before touching the release tag, found the actual root
+cause in a few minutes — something no amount of re-reading the code would have surfaced.
+Now it's a hard rule in CLAUDE.md: no new build tag without an on-device repro first.
 
 ---
 
@@ -125,9 +217,13 @@ A new service already includes the full deployment checklist.
 | Persistent memory | Cross-session continuity without re-explaining |
 | Short imperative commands | Fast, no ambiguity |
 | Ask for options on uncertain choices | Avoids rework on the wrong approach |
+| Fixed execution methodology | Proposal → validation → sequential execution → review |
 | Validate each step before the next | Tight feedback loop, errors caught early |
 | Explicit numbered rules | No negotiation on critical constraints |
 | Ask before long implementations | Alignment before effort |
+| Security by design in CLAUDE.md | First proposal is already hardened, no retrofitting |
+| Documentation philosophy in CLAUDE.md | Every doc produced is pedagogical by default |
+| Real-device repro before tagging a fix (mobile) | Catches root causes a code review alone misses |
 
 ---
 
