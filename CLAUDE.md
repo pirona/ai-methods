@@ -157,6 +157,8 @@ backend bk_<service>
 
 - Convention: imperative present tense, English (`Add`, `Fix`, `Remove`)
 - No direct commits to `main` — MR/PR mandatory
+- **Always `git pull`/`git fetch` before any `git push`**, in every repo — don't wait for
+  a rejected push to discover the remote has diverged.
 
 #### Push to self-hosted Git — always via SSH
 
