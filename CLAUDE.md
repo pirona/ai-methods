@@ -282,7 +282,45 @@ git push origin v1.x.y          # tag répliqué → Actions déclenché → Rel
 
 ---
 
-## 11. General rules for Claude Code
+## 11. Local AI image generation platform — Known constraints
+
+- Self-hosted node-based image generation tool (ComfyUI-style), reachable over HTTP on
+  the local network, with workflows stored as JSON files on disk.
+- A local LLM server (Ollama-style) runs on the same host as the image generation tool —
+  connect to it via loopback address, not the network IP.
+- Resolution guidance for modern flow-matching image models (per official model docs):
+  dimensions must be multiples of 32, minimum 256px, maximum ~4MP, ~2MP recommended for
+  quality/speed. Common ~1MP presets: 1024x1024 (1:1), 1152x896/896x1152 (4:3/3:4),
+  1216x832/832x1216 (3:2/2:3), 1344x768/768x1344 (16:9/9:16), 1536x640/640x1536 (21:9/9:21).
+
+### Working rule for existing workflow files
+
+- **Never edit an existing workflow file.** Always copy it to a new file with a
+  `_claude.json`-style suffix (increment to `_v2` etc. if one already exists).
+- To build a new workflow, find existing files that already contain the wanted patterns
+  and copy their exact node structures (`type`, `inputs`, `widgets_values`) instead of
+  guessing widget keys from memory.
+
+### Known gotchas
+
+1. **Workflow root UUID** (the top-level `"id"` field in the JSON): it identifies the
+   workflow to the server. Copying a file without regenerating this UUID causes a
+   `409 Conflict` on save. Always generate a fresh UUID for any copied workflow file.
+2. **Duplicate custom node plugin installs**: when the same node pack is installed
+   twice (e.g. two folders under the custom-node directory), schemas can drift between
+   older saved workflows and what's actually loaded. **Always verify a node's real schema
+   against the live server's introspection API before copying it** rather than trusting
+   an example file — node names containing special characters (like `/`) can break naive
+   URL-encoded lookups, so fetch the full introspection dump and filter client-side in
+   that case.
+3. **Save-image nodes with a "unique filename" feature**: some implementations only
+   start appending a numeric suffix from the *second* saved file with a given prefix —
+   the very first file gets no suffix at all. Include a dynamic placeholder (timestamp,
+   seed, etc.) in the filename prefix to guarantee uniqueness from the first run.
+
+---
+
+## 12. General rules for Claude Code
 
 1. **Always verify** that a dedicated Let's Encrypt cert exists before proposing
    a public URL for a new service.
