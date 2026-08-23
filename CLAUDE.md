@@ -630,3 +630,23 @@ real cause — a missing API parameter, invisible from reading the client busine
    start appending a numeric suffix from the *second* saved file with a given prefix —
    the very first file gets no suffix at all. Include a dynamic placeholder (timestamp,
    seed, etc.) in the filename prefix to guarantee uniqueness from the first run.
+
+---
+
+## 15b. Graphic design — required references
+
+> Hard rule, across every project (image generation, artifacts, mascots/icons, layout,
+> print...).
+
+For any graphic-design request (composition, layout, shape choices, figure/ground
+relationship, visual hierarchy, identity work...), always apply the operator's own reference
+texts on the subject. This template ships with none by default — list your own reference
+works here, e.g.:
+
+- *(operator's reference book #1)*
+- *(operator's reference book #2)*
+
+Mobilize these principles actively in the proposal (not just cited at the end of the
+response): relationship between elements and the frame, tension/rest of shapes, visual
+weight of point/line/plane, economy of means. Applies as much to an art direction (e.g. a
+mascot, an app's identity) as to an artifact layout or a generated poster.
