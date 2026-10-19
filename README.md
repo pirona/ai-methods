@@ -6,6 +6,9 @@ If you like it and/or useit, please consider a coffee ^ :
 A practical account of how I get consistent, high-quality results from Claude Code
 across infrastructure, development, and creative projects.
 
+Companion files: [`CLAUDE.md`](CLAUDE.md) (the full operator template, section 21 explains the memory
+architecture) and [`APPENDIX-skills.md`](APPENDIX-skills.md) (the shared skills we built together).
+
 ---
 
 ## 1. The Foundation: CLAUDE.md as a Persistent Contract
@@ -15,7 +18,7 @@ stored at the project (or global) level. It contains:
 
 - **My role and context** — sysadmin, Linux/K8s, electronic music artist
 - **Full infrastructure topology** — hypervisor, cluster, NAS, networking, services
-- **Hard constraints** — HAProxy/TLS rules that must never be violated, ZFS rules, etc.
+- **Hard constraints** — HAProxy/TLS rules that must never be violated, storage and safety rules, etc.
 - **Tech stack reference** — so Claude never suggests tools outside my ecosystem
 - **Numbered rules** — explicit, non-negotiable behaviors (no wildcard certs, no TLS bypass, etc.)
 - **Security by design** — hardening is a design constraint from day 1, not a post-deployment pass
@@ -29,16 +32,21 @@ constraint emerges from real experience.
 
 ## 2. Memory System for Cross-Session Continuity
 
-Claude Code has a persistent file-based memory system (`~/.claude/projects/.../memory/`).
-I use it to store:
+Claude Code has a persistent file-based memory system (`~/.claude/projects/.../memory/`). I use it
+for per-machine pointers, but the memory that matters is **versioned in git**, in the same repository
+as my global `CLAUDE.md`, so any workstation resumes the work with a single `git pull`:
 
-- **User profile** — who I am, how I like to communicate
-- **Project state** — current bugs, in-progress work, key decisions
-- **Feedback** — corrections and confirmed approaches from past sessions
-- **References** — where to find things in external systems
+- **A short global `CLAUDE.md`** — profile, hard rules, and one index line per project. It is loaded in
+  full every session, so its size matters: moving detail out of it cut it by about a third.
+- **One memory file per project** (`memory/NN-slug.md`) — state, decisions, pitfalls, procedures. Loaded
+  only when the task touches that project. Large projects get a short file plus a chronological journal.
+- **A cross-project rules file** — collaboration, safety and image-generation rules, re-read before
+  visual work, PRs or any destructive action.
+- **Shared skills** — repeated procedures loaded on demand (see section 14 and the appendix).
+- **Local auto-memory** — profile, feedback and references, kept as pointers.
 
-This means a new session picks up exactly where the last one left off, without me
-having to re-explain context.
+The first action of every session is a `git pull` on that repository, and "memory and stop" triggers a
+full capitalization protocol (project state, methods, wiki, local pointer). Details: `CLAUDE.md`, section 21.
 
 ---
 
@@ -80,7 +88,7 @@ In my CLAUDE.md I encode rules as numbered, imperative statements:
 
 - "Never disable TLS verification, even in dev"
 - "Never suggest wildcard certs — one cert per subdomain"
-- "ZFS: always add disks in pairs"
+- "Never kill or delete anything without explicit approval"
 - "Every new service = dedicated cert → HAProxy frontend → backend → test"
 
 These are derived from real incidents or strong personal constraints. Claude treats
@@ -162,7 +170,7 @@ A new service already includes the full deployment checklist.
 
 ---
 
-## 10. The Execution Methodology — Locked In
+## 11. The Execution Methodology — Locked In
 
 Every session follows a fixed protocol, encoded in CLAUDE.md so it applies automatically.
 
@@ -185,7 +193,7 @@ The discipline here is the point: Claude proposes, I validate, Claude executes o
 
 ---
 
-## 11. Real-Device Validation Loop (Mobile Projects)
+## 12. Real-Device Validation Loop (Mobile Projects)
 
 For mobile projects, a fix isn't "done" because the code review looks right — it's done
 after Claude has reproduced the exact bug on a physical device and watched it actually go
@@ -209,6 +217,33 @@ Now it's a hard rule in CLAUDE.md: no new build tag without an on-device repro f
 
 ---
 
+## 13. Safety Rules Learned From Real Incidents
+
+Three rules were added after something actually went wrong, and they are non-negotiable:
+
+- **Never kill, never delete without explicit approval** — files, workflows, cluster resources, posts,
+  branches, jobs, processes; including test objects Claude created itself. Claude flags and proposes,
+  it never executes on its own. Helper processes stop by themselves (`timeout`), they are not killed.
+- **Thinking aloud is not a request to implement.** When I describe an example mid-design, Claude
+  restates its understanding and asks "do you want me to implement this?" first. A 150-line feature coded
+  from a passing example once had to be reverted entirely.
+- **Feature PRs get a code review before merge** (correctness, security, interactions with what exists),
+  reported to me before the merge is proposed. A pure fix is exempt.
+
+---
+
+## 14. Shared Skills — Procedures Loaded On Demand
+
+Procedures I repeat (end-of-session capitalization, PR → merge → deploy, cleanly cutting out an
+illustration, driving an image server, pushing a blog draft) became **skills**: short files Claude loads
+only when their description matches what I ask. They live in the same git repository as my memory and are
+symlinked into `~/.claude/skills` on each workstation. Every incident adds one line to the relevant skill,
+so they get sharper over time.
+
+The pattern and the five skills we built together are in [`APPENDIX-skills.md`](APPENDIX-skills.md).
+
+---
+
 ## Key Takeaways
 
 | What I do | Why it works |
@@ -224,8 +259,11 @@ Now it's a hard rule in CLAUDE.md: no new build tag without an on-device repro f
 | Security by design in CLAUDE.md | First proposal is already hardened, no retrofitting |
 | Documentation philosophy in CLAUDE.md | Every doc produced is pedagogical by default |
 | Real-device repro before tagging a fix (mobile) | Catches root causes a code review alone misses |
+| Memory versioned in git, split per project | Any workstation resumes with one `git pull`; `CLAUDE.md` stays small |
+| "Never kill or delete without approval" | Destructive mistakes become impossible by default |
+| Shared skills + "memory and stop" | Repeated procedures are followed to the letter, and every session leaves the method sharper |
 
 ---
 
-*This document reflects my personal workflow as of mid-2026.
+*This document reflects my personal workflow as of October 2026.
 The method evolves — constraints get added, rules get refined from real incidents.*
