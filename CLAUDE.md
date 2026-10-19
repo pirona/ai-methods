@@ -3,12 +3,14 @@
 > **Public template for Claude Code configuration.**
 > This file captures a complete operator profile for a Linux infrastructure engineer
 > with a self-hosted homelab. Fork it, adapt the sections to your own stack,
-> and replace `[FILL IN: ...]` markers with your own values.
+> and replace the generic descriptions and `<placeholders>` with your own values.
 > Sections on TLS rules, CI conventions, and general guidelines are universal
 > and can be used as-is or lightly adjusted.
 >
 > Original profile: Linux/K8s infrastructure, self-hosted services, HAProxy TLS termination,
 > GitOps with ArgoCD, electronic music production as a side domain.
+>
+> See `APPENDIX-skills.md` for the shared-skills pattern (reusable procedures loaded on demand).
 
 ---
 
@@ -17,8 +19,9 @@
 - **Role:** Linux Systems & Network Engineer — CKA certified, infrastructure specialist
 - **Creative domain:** Electronic music composer / visual artist (trip-hop/downtempo)
 - **Communication:** Direct, concise, technical. No unnecessary preamble.
-  Undiagnosed neurodivergence — prefer structured responses, no ambiguity,
-  with a clear information hierarchy.
+  Prefer structured responses, no ambiguity, with a clear information hierarchy.
+  Often gives very short instructions ("restart the build", "commit & push everything") —
+  no detailed explanations needed unless something goes wrong.
 - **Language:** French by default for conversation, English for code and config files.
 
 ---
@@ -32,7 +35,7 @@
 | Hypervisor      | Proxmox VE on low-power x86 SBC               |
 | K8s cluster     | K3s — 1 control plane, 2 workers              |
 | NAS             | OpenMediaVault                                |
-| Storage         | ZFS mirror pool + hardware RAID (parallel)    |
+| Storage         | Directory storage on the hypervisor (qcow2 VMs, raw containers — no snapshot for containers); NAS disks without redundancy |
 | Monitoring      | Lightweight push-based monitoring stack       |
 
 ### Network
@@ -53,6 +56,7 @@
 | Analytics platform   | Self-hosted web analytics                   |
 | Blog platform        | Multiple blogs on dedicated LXC containers  |
 | File sync platform   | Avoid special characters in base64 secrets  |
+| Push notifications   | Auth on, default deny; one restricted write-only account per integration, one topic each |
 
 ---
 
@@ -61,9 +65,9 @@
 ### IaC & orchestration
 
 ```
-Kubernetes (K3s / CKA)   Ansible / AWX
-Terraform                ArgoCD
-GitLab CI/CD             Proxmox API
+Kubernetes (K3s / CKA)   Ansible
+ArgoCD                   GitLab CI/CD
+Proxmox API
 ```
 
 ### Linux & security
@@ -72,7 +76,6 @@ GitLab CI/CD             Proxmox API
 - Hardening: **ANSSI** Linux hardening guidelines
 - Internal CA: certificates go in `/usr/local/share/ca-certificates/`,
   then `update-ca-certificates` — never disable TLS verification
-- ZFS: ARC tuning, snapshots via **sanoid**, always add disks in pairs
 
 ### Main workstation
 
@@ -80,7 +83,7 @@ GitLab CI/CD             Proxmox API
 CPU   Modern Intel high-core-count desktop
 RAM   32 GB DDR5
 OS    Windows 11
-WSL   Present but limited use
+WSL   Actively used (file access to the other drives, interop with Windows processes)
 ```
 
 ---
@@ -147,12 +150,6 @@ backend bk_<service>
 - Sensitive variables in CI/CD Variables (masked + protected)
 - Canonical stages: `validate → build → test → deploy`
 
-### Terraform
-
-- Remote state backend (never local in prod)
-- `terraform fmt` + `terraform validate` before any commit
-- Modules explicitly versioned
-
 ### Git (self-hosted)
 
 - Convention: imperative present tense, English (`Add`, `Fix`, `Remove`)
@@ -198,6 +195,8 @@ Store tokens in files outside any repository, never in URLs or shell arguments.
 ~/.tokens/<service>_pat   # chmod 600, parent dir chmod 700
 ```
 
+The token location can differ per workstation: write it once per machine in the config, and never assume it.
+
 For GitHub HTTPS operations, register via git credential store:
 
 ```bash
@@ -219,7 +218,7 @@ github_pat*
 
 ---
 
-## 6b. Wiki — Multi-platform workflow (self-hosted Git + GitHub)
+## 7. Wiki — Multi-platform workflow (self-hosted Git + GitHub)
 
 > Applies to any project hosted on a self-hosted Git instance with a push mirror to GitHub.
 
@@ -230,11 +229,21 @@ Both wikis must be pushed independently on every documentation update.
 ### Repository URLs
 
 ```
-Self-hosted wiki  :  ssh://git@<your-git-host>:<port>/<username>/<repo>.wiki.git  (branch: master)
+Self-hosted wiki  :  ssh://git@<your-git-host>:<port>/<username>/<repo>.wiki.git  (branch: <default-branch>, see below)
 GitHub wiki       :  https://github.com/<github-user>/<repo>.wiki.git             (branch: master)
 ```
 
-The `master` branch is mandatory on Gitea — it is the only branch the Gitea wiki UI reads.
+**Never hard-code the self-hosted wiki branch.** The Gitea wiki UI reads only the repository's default
+branch (HEAD), whatever it is — it depends on the instance's `DEFAULT_BRANCH` when the wiki repo was
+created, and it can change over time. Pushing to another branch silently creates an orphan branch that
+the UI never shows. Always check before pushing:
+
+```bash
+git ls-remote --symref ssh://git@<your-git-host>:<port>/<username>/<repo>.wiki.git HEAD
+# → ref: refs/heads/<default-branch>
+```
+
+GitHub wikis, on the other hand, stay on `master`, even when the code repo moved to `main`.
 
 ### Initial setup
 
@@ -247,7 +256,7 @@ cd wiki-<repo>/
 git remote add github https://github.com/<github-user>/<repo>.wiki.git
 
 # Push both
-git push origin master
+git push origin <default-branch>
 git push github master --force   # --force only if GitHub had an init placeholder page
 ```
 
@@ -260,7 +269,7 @@ git push github master --force   # --force only if GitHub had an init placeholde
 cd wiki-<repo>/
 # … edit .md files …
 git add -A && git commit -m "docs: <description>"
-git push origin master   # self-hosted Git
+git push origin <default-branch>   # self-hosted Git
 git push github master   # GitHub
 ```
 
@@ -280,7 +289,7 @@ Never use a single link that only resolves correctly on one platform.
 
 ---
 
-## 6c. LLM Council — Multi-model strategic decisions
+## 8. LLM Council — Multi-model strategic decisions
 
 > Credit: [LLM Council skill](https://github.com/aiwithremy/claude-skills-llm-council)
 > by [@aiwithremy](https://github.com/aiwithremy) — genuinely excellent, highly recommended.
@@ -307,7 +316,7 @@ Use via Claude Desktop, not Claude Code — the skill runs as a slash command in
 
 ---
 
-## 7. CI methodology: self-hosted Git (no runner) → push mirror → GitHub Actions
+## 9. CI methodology: self-hosted Git (no runner) → push mirror → GitHub Actions
 
 > Reusable template for any project hosted on a self-hosted Gitea instance
 > (no local CI runner), with automated builds via free GitHub Actions runners.
@@ -416,7 +425,7 @@ asset uploads, and make it harder to bisect which tag introduced a regression.
 
 ---
 
-## 7. Automation platform — Known constraints
+## 10. Automation platform — Known constraints
 
 > Applies to n8n or any similar workflow automation platform.
 
@@ -430,7 +439,7 @@ asset uploads, and make it harder to bisect which tag introduced a regression.
 
 ---
 
-## 8. Kubernetes (K3s)
+## 11. Kubernetes (K3s)
 
 - Cluster: 1 control plane + 2 workers
 - GitOps via **ArgoCD**
@@ -440,7 +449,7 @@ asset uploads, and make it harder to bisect which tag introduced a regression.
 
 ---
 
-## 9. Domains & DNS
+## 12. Domains & DNS
 
 - All public traffic goes through HAProxy (see section 4)
 - Existing subdomains must be checked before any modification
@@ -449,7 +458,7 @@ asset uploads, and make it harder to bisect which tag introduced a regression.
 
 ---
 
-## 10. General rules for Claude Code
+## 13. General rules for Claude Code
 
 1. **Always verify** that a dedicated Let's Encrypt cert exists before proposing
    a public URL for a new service.
@@ -463,7 +472,7 @@ asset uploads, and make it harder to bisect which tag introduced a regression.
    rather than imposing a choice.
 8. Shell commands must be **directly copy-pasteable** — no ambiguous placeholders
    without explicit explanation of what to substitute.
-9. **ZFS:** always add disks in pairs, never break a mirror to save cost.
+9. **NAS storage:** the disks have no redundancy — never suggest software RAID or ZFS without prior discussion.
 10. Every new homelab service requires: dedicated cert → HAProxy frontend → backend → test.
 11. **Documentation language:** Public-facing documentation must be written in **English**.
     Private documentation (personal wiki) in **French**.
@@ -478,10 +487,18 @@ asset uploads, and make it harder to bisect which tag introduced a regression.
 14. **Sequential by default**: never run multiple actions in parallel without explicit approval.
     If parallelism seems worthwhile (truly independent actions, significant time gain), submit
     the opinion for validation before acting.
+15. **Never kill, never delete without explicit approval.** No deletion (file, workflow, credential,
+    cluster resource, post, snapshot, branch, API object) and no stopping of a process, pod or service
+    (`kill`, `kubectl delete`, HTTP `DELETE`…) without a request or validation for that exact action —
+    including test objects Claude created itself. Flag and propose, never execute on its own.
+    Helper processes started for a test should stop by themselves (`timeout 150 <command>`), not be killed.
+16. **Throwaway examples and tests are non-impacting**: read-only, fake or disposable data, never a real
+    publication, deletion or overwrite on a real system. (Optional: slip a small joke into the sample
+    content — it makes test artefacts easy to recognize and to clean up.)
 
 ---
 
-## 11. Security by design
+## 14. Security by design
 
 Security hardening is a first-class design constraint from day 1 of every project —
 not a post-deployment audit or an optional hardening pass.
@@ -503,42 +520,7 @@ not a post-deployment audit or an optional hardening pass.
 
 ---
 
-## 13. Working Methodology
-
-### Strategic questions / vague instructions
-
-Use **LLM Council** (Claude Desktop skill) to get cross-model perspectives before deciding.
-If unavailable: list options with trade-offs, wait for selection.
-
-### Precise orders — mandatory sequence
-
-1. **Review existing state** — read code, configs, and related services before any action.
-2. **What do we want?** — restate the objective in one clear sentence and submit it.
-3. **How will we do it?** — complete action plan submitted for validation before execution.
-4. **Integration** — explicitly identify how the change integrates with the existing system
-   (dependencies, interfaces, side effects).
-5. **Simplicity first** — simplest, functional, maintainable solution.
-   No premature abstractions, no unnecessary dependencies.
-
-### Execution rules
-
-- **No action without prior validation.**
-- **Strictly sequential**: one step at a time, in the order of the validated plan.
-  No parallel or simultaneous actions without explicit agreement.
-
-### After each implementation / deployment
-
-Systematic code review of all interactions between what was just deployed and the existing system:
-interfaces, dependencies, potential side effects.
-
-### When the user says "ok"
-
-1. Final code review — complete verification of all changes.
-2. Project memory update — save key decisions, identified constraints, and project state.
-
----
-
-## 12. Documentation philosophy
+## 15. Documentation philosophy
 
 Documentation is written from the first day of a project and evolves alongside the work
 until completion. It is never a post-mortem dump or an afterthought.
@@ -559,10 +541,57 @@ until completion. It is never a post-mortem dump or an afterthought.
 
 ---
 
-## 14. Acceptance testing — real-device validation via adb
+## 16. Working Methodology
+
+### Strategic questions / vague instructions
+
+Use **LLM Council** (Claude Desktop skill) to get cross-model perspectives before deciding.
+If unavailable: list options with trade-offs, wait for selection.
+
+### Precise orders — mandatory sequence
+
+1. **Review existing state** — read code, configs, and related services before any action.
+2. **What do we want?** — restate the objective in one clear sentence and submit it.
+3. **How will we do it?** — complete action plan submitted for validation before execution.
+4. **Integration** — explicitly identify how the change integrates with the existing system
+   (dependencies, interfaces, side effects).
+5. **Simplicity first** — simplest, functional, maintainable solution.
+   No premature abstractions, no unnecessary dependencies.
+
+### Thinking aloud is not a request to implement
+
+When the user describes a use case, an example, or explores an idea during a design discussion:
+restate the understanding and ask explicitly "do you want me to implement this?" before touching
+code. Only an explicit action request ("go", "implement", "do it") authorizes the move to code.
+Lesson learned: a 150+ line feature was once coded from an example given mid-design
+("my typical breakfast") and had to be reverted entirely.
+
+### Execution rules
+
+- **No action without prior validation.**
+- **Strictly sequential**: one step at a time, in the order of the validated plan.
+  No parallel or simultaneous actions without explicit agreement.
+
+### After each implementation / deployment
+
+Systematic code review of all interactions between what was just deployed and the existing system:
+interfaces, dependencies, potential side effects.
+
+**Feature PRs get a code review before merge** — correctness, security, interactions with what
+already exists — and its conclusions are reported to the user before proposing the merge.
+A pure fix is exempt.
+
+### When the user says "ok"
+
+1. Final code review — complete verification of all changes.
+2. Project memory update — save key decisions, identified constraints, and project state.
+
+---
+
+## 17. Acceptance testing — real-device validation via adb
 
 > Applies to any mobile project (Android/iOS) with access to a physical device.
-> Complements section 7 (CI methodology) and section 13 (working methodology) — does not
+> Complements section 9 (CI methodology) and section 16 (working methodology) — does not
 > replace them.
 
 A bug is only considered fixed, and a fix is only ready to be committed/tagged, after it has
@@ -580,7 +609,7 @@ plausible hypothesis, or theoretical reasoning alone, no matter how solid it loo
   after the action, not just the client-side display — a screen can look correct while
   persistence silently failed.
 - **Never push a new build tag on the strength of an unverified hypothesis about a device
-  bug.** Fix, reproduce, confirm, only then commit/tag — see section 7 (one build at a time,
+  bug.** Fix, reproduce, confirm, only then commit/tag — see section 9 (one build at a time,
   explicit user validation between tags, including when a new fix hypothesis follows a first
   attempt that failed).
 - **Reproduce on test data, never on production data without explicit approval**: for a
@@ -595,7 +624,7 @@ real cause — a missing API parameter, invisible from reading the client busine
 
 ---
 
-## 15. Local AI image generation platform — Known constraints
+## 18. Local AI image generation platform — Known constraints
 
 - Self-hosted node-based image generation tool (ComfyUI-style), reachable over HTTP on
   the local network, with workflows stored as JSON files on disk.
@@ -605,6 +634,23 @@ real cause — a missing API parameter, invisible from reading the client busine
   dimensions must be multiples of 32, minimum 256px, maximum ~4MP, ~2MP recommended for
   quality/speed. Common ~1MP presets: 1024x1024 (1:1), 1152x896/896x1152 (4:3/3:4),
   1216x832/832x1216 (3:2/2:3), 1344x768/768x1344 (16:9/9:16), 1536x640/640x1536 (21:9/9:21).
+
+### Submitting jobs
+
+- **One image = one job**, in small quantities (6 options, not 12), fire-and-forget: one API call per
+  image, results fetched afterwards from the history endpoint. Never a big batch, never a script that
+  keeps the queue full.
+- Never interrupt or delete a job — not even your own — without explicit approval; the user cancels
+  what they want from the UI.
+- If a queue-manager custom node is installed, the API call **must** carry
+  `extra_data.extra_pnginfo.workflow` with an `id` and a `workflow_name`: without it the worker crashes
+  and the job stays "running" forever (only a server restart clears it).
+- On a RAM-limited machine: use the fp8 text encoder, never the bf16 one next to a large model, and
+  free models/cache after every job. Explore with the small fast model, render the final with the large one.
+- **Regenerating a figure that touches the frame**: keep the previous image, put the original render
+  on a larger white canvas and pass it as a **reference image** so the drawing stays close; if the crop
+  is on the sides the model tends to copy it — fall back to the original model with a larger canvas.
+  The goal is 0 opaque pixels on the four borders of the final cut-out.
 
 ### Working rule for existing workflow files
 
@@ -633,7 +679,7 @@ real cause — a missing API parameter, invisible from reading the client busine
 
 ---
 
-## 15b. Graphic design — required references
+## 19. Graphic design — required references
 
 > Hard rule, across every project (image generation, artifacts, mascots/icons, layout,
 > print...).
@@ -650,3 +696,73 @@ Mobilize these principles actively in the proposal (not just cited at the end of
 response): relationship between elements and the frame, tension/rest of shapes, visual
 weight of point/line/plane, economy of means. Applies as much to an art direction (e.g. a
 mascot, an app's identity) as to an artifact layout or a generated poster.
+
+### Unbridled creativity by default
+
+For anything visual or playful (theme, illustration, animation, mascot, easter egg, layout), the
+default criterion is a strong, surprising, memorable stance rather than the safe, decorative version.
+A theme that is "nice but tame" is a failure. Concept first (strong metaphor, interactions, details),
+then careful execution — without sacrificing legibility, contrast, or `prefers-reduced-motion`.
+
+---
+
+## 20. Blog / CMS posts — mandatory fields
+
+> Applies to any post published or saved as a draft on a managed blog instance (Ghost or similar),
+> whether Claude writes it from scratch or pushes/edits it through the Admin API.
+
+A post must never stay without:
+
+1. **A feature image** — never push or publish a post without a cover image.
+2. **The meta fields filled** — `meta_title` and `meta_description`, plus the social cards
+   (`og_title`/`og_description`, `twitter_title`/`twitter_description`) at least as text. The social
+   *images* may stay empty (the CMS falls back to the feature image); titles and descriptions must be
+   written, never left `null`.
+
+If they were not provided, write them from the real content of the article (no generic placeholder)
+before considering the task done — do not wait to be asked. Always create as **draft**; publishing or
+deleting a post requires explicit approval (rule 15). Re-read the post through the API after creation
+(status, meta, tags) and give the editing link.
+
+---
+
+## 21. Persistent memory and shared skills
+
+> This is the architecture behind the "persistent contract" described in the README. The detail of
+> how skills are built and shared is in `APPENDIX-skills.md`.
+
+### Layers
+
+| Layer | Content | Loaded |
+|-------|---------|--------|
+| Global `CLAUDE.md` | Operator profile, hard rules, one index line per project | Every session — keep it small |
+| `memory/NN-slug.md` | One file per project: state, decisions, pitfalls, procedures | Only when the task touches that project |
+| `memory/NN-slug-journal.md` | Chronological log of a large project (the short file keeps state + a table of contents with line numbers) | On demand, by line range or `grep -n` |
+| `memory/transverse-rules.md` | Rules valid across projects (collaboration, safety, images…) | Before visual work, PRs, or any destructive action |
+| `skills/<name>/SKILL.md` | Repeated procedures, loaded only when triggered | When the description matches |
+| Local auto-memory (per machine, not versioned) | Pointers and per-machine facts only | Index every session |
+
+### Why
+
+- `CLAUDE.md` is loaded in full at every session: detail moved out of it into per-project files cut its
+  size by about a third and keeps it far below the size limit.
+- Everything lives in **one git repository**, so any workstation resumes the work with a single
+  `git pull`. A memory that only lives locally does not achieve that.
+- **First action of every session: `git pull` on that config repository** — it is the shared source of
+  truth and a workstation can be behind.
+
+### "Memory and stop" protocol
+
+When the user says "save to memory" / "memory and stop", capitalize everything reusable from the
+session, not only the project state:
+
+1. Pull the config repository.
+2. **Project state**: update the project file (decisions, pitfalls, progress, approved-but-unexecuted
+   plans); for a split project, add the session to the **journal** then update the short file.
+3. **Cross-project rules** go to `transverse-rules.md`.
+4. **Reusable methods** (recipe, script, pitfall, measurement) go to the methods repository that fits,
+   as tested code plus documentation (why, how to verify, rollback). Update, do not duplicate.
+5. **Wiki**: the project wiki page(s), following the multi-platform process of section 7.
+6. **Local memory**: add a pointer, fix or remove entries that became wrong.
+7. Short imperative commit, `git pull --rebase`, push.
+8. **Report**: a short list of what was capitalized and where — and what was *not* done, and why.
