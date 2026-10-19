@@ -142,13 +142,66 @@ description: Ship a change through Gitea: branch, PR via API, merge, then deploy
 
 ### 2.4 `comfyui-headless-job` — driving an image server without choking the machine
 
-- **Trigger:** any render driven by script against a local node-based image generator.
+- **Trigger:** any render driven by script against a local node-based image generator (ComfyUI-style, HTTP API).
 - **Rules (full list in `CLAUDE.md` section 18):** one image = one job, never more than one of ours in the
   queue, always the `extra_pnginfo.workflow` metadata, fp8 text encoder, free models after each job, poll with
   retry on timeout (the server answers slowly while swapping), never interrupt or delete a job.
 - **Practical split:** explore with the small fast model (about 20 s), render the final with the large one
   (minutes). If a job exceeds about 10 minutes the machine is swapping: check free RAM and *propose* a
   restart — do not do it unasked.
+
+#### How Claude knows the installation (read-only, nothing assumed)
+
+Everything is read through the API before the first render:
+
+| Question | Call | What it gives |
+|---|---|---|
+| Is the server up, which version, which GPU, how much RAM is free? | `GET /system_stats` | `system.ram_free` / `ram_total` (bytes), `devices[].vram_total`, version |
+| Is the queue free? | `GET /queue` | `queue_running` + `queue_pending` empty → safe to submit |
+| Does a node exist, and which fields does it take? | `GET /object_info` (or `/object_info/<NodeClass>`) | list-typed fields **enumerate the model files the server actually sees** (`unet_name`, `clip_name`, `vae_name`, `lora_name`) |
+| Does a plugin impose rules? | `python_module` of each class in `/object_info` | e.g. a queue-manager plugin → workflow metadata becomes mandatory |
+| Is a job finished, and how? | `GET /history/<prompt_id>` | `status.status_str` and `outputs` (folder + filename) |
+
+Why the API and not the disk: `/object_info` lists what the server really *loads* — a model file dropped in
+the wrong folder simply does not appear. Model names include their sub-folder, with the separator of the
+server's operating system. A small pre-flight script runs these checks and answers "ready" or "not ready:
+<what is missing>" — instead of discovering a wrong model name through an error in the middle of a render.
+Verify: it should report the server version, free RAM above your threshold, an empty queue, every node and
+model of the workflow present, and whether a queue plugin is installed.
+
+```bash
+curl -s http://<comfy-host>:8188/system_stats | python3 -m json.tool | head -20
+curl -s http://<comfy-host>:8188/queue
+curl -s http://<comfy-host>:8188/object_info/UNETLoader   # input.required.unet_name[0] = the model files available
+```
+
+#### How a call is built
+
+A workflow in "API format" is a dictionary `{"<id>": {"class_type": …, "inputs": {…}}}`. An input is either a
+**value** (`"seed": 42`) or a **link** `["<other node id>", <output index>]`.
+
+```json
+{"prompt": { "...graph...": {} }, "client_id": "<uuid>",
+ "extra_data": {"extra_pnginfo": {"workflow": {"id": "<uuid>", "workflow_name": "<name>", "nodes": [], "links": []}}}}
+```
+
+1. `POST /prompt` returns `{"prompt_id": …}`.
+2. Poll `GET /history/<prompt_id>` every 5-10 s **with retry on timeout**.
+3. Read `outputs` — `{"<node id>": {"images": [{"filename", "subfolder", "type"}]}}` — the file is in the server's
+   output folder, under `<subfolder>`.
+4. `POST /free` with `{"unload_models": true, "free_memory": true}` to release RAM after the job.
+
+Reference images are files copied into the server's input folder, read by a load-image node and chained
+through reference-latent nodes. For a model whose graph is already stored in the PNG metadata, the graph is
+**read back, not rebuilt**: only size, seed, positive prompt and output prefix are changed (the text goes to the
+node the sampler links as `positive`, never the negative one), and the original file is never modified.
+
+#### Transparency clause (worth copying into your own skill)
+
+For every job the assistant states what it submitted (model, seed, size, prompt, reference) and what came
+out — **failures included**; it looks at each image before presenting it; after two failures of the same
+approach it stops and proposes options instead of retrying in silence; it ends with the count of jobs it
+launched. It never touches the user's own queue, and never starts the server without approval.
 
 ### 2.5 `cms-draft` — pushing a post to a blog as a draft
 
